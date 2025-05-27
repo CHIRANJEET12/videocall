@@ -1,5 +1,4 @@
-import React from 'react'
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react';
 
 export const User1 = () => {
     const socketRef = useRef<WebSocket | null>(null);
@@ -7,11 +6,8 @@ export const User1 = () => {
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const remoteStreamRef = useRef<MediaStream | null>(new MediaStream());
 
-
-
-    //connection setup
     useEffect(() => {
         const socket = new WebSocket('ws://localhost:8080');
         socketRef.current = socket;
@@ -20,26 +16,24 @@ export const User1 = () => {
         pcRef.current = pc;
 
         socket.onopen = () => {
-            console.log('user1 connected');
-            socket.send(JSON.stringify({
-                type: 'user1'
-            }))
+            console.log('User1 connected');
+            socket.send(JSON.stringify({ type: 'sender' }));
         };
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
                 socket.send(JSON.stringify({
-                    type: 'icecandidate',
+                    type: 'iceCandidate',
                     candidate: e.candidate
-                }))
+                }));
             }
         };
 
-        socket.onmessage = (e) => {
+        socket.onmessage = async (e) => {
             try {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'createAnswer') {
-                    pc.setRemoteDescription(msg.sdp);
+                    await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
                 } else if (msg.type === 'iceCandidate') {
                     pc.addIceCandidate(msg.candidate);
                 }
@@ -48,61 +42,54 @@ export const User1 = () => {
             }
         };
 
+        pc.ontrack = (event) => {
+            if (remoteStreamRef.current) {
+                remoteStreamRef.current.addTrack(event.track);
+                if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStreamRef.current;
+                }
+            }
+        };
 
-pc.ontrack = (event) => {
-  console.log('Received remote track:', event.track.kind); // Should log "video"
-  if(videoRef.current){
-    const stream = videoRef.current.srcObject as MediaStream || new MediaStream();
-    stream.addTrack(event.track);
-    videoRef.current.srcObject = stream;
-    videoRef.current.play();
-  }
-};
+        startMedia();
 
-
+        // Cleanup on unmount
+        return () => {
+            socket.close();
+            pc.close();
+            streamRef.current?.getTracks().forEach(track => track.stop());
+        };
     }, []);
 
-    //video accessing and more
-const startMedia = async () => {
-  try {
-    // First enumerate devices to check available cameras
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    console.log('Video devices:', devices.filter(d => d.kind === 'videoinput'));
+    const startMedia = async () => {
+        try {
+            const constraints = {
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: true
+            };
 
-    // Try getting media with fallback options
-    const constraints = {
-      video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: true
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            streamRef.current = stream;
+
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+
+            stream.getTracks().forEach(track => {
+                pcRef.current?.addTrack(track, stream);
+            });
+
+            const offer = await pcRef.current?.createOffer();
+            await pcRef.current?.setLocalDescription(offer);
+            socketRef.current?.send(JSON.stringify({
+                type: 'createOffer',
+                sdp: offer
+            }));
+
+        } catch (err) {
+            console.error('Media access error:', err);
+        }
     };
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    streamRef.current = stream;
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    stream.getTracks().forEach(track => {
-      pcRef.current?.addTrack(track, stream);
-    });
-
-    // Only create offer if this is User1
-    if (socketRef.current?.url.includes('user1')) {
-      const offer = await pcRef.current?.createOffer();
-      await pcRef.current?.setLocalDescription(offer);
-      socketRef.current?.send(JSON.stringify({
-        type: 'createOffer',
-        sdp: offer
-      }));
-    }
-  } catch (err) {
-    console.error('Media access error:', err);
-    // alert(`Failed to access camera/microphone: ${err.message}`);
-  }
-};
 
     const toggleAudio = () => {
         const audioTrack = streamRef.current?.getAudioTracks()[0];
@@ -120,9 +107,6 @@ const startMedia = async () => {
         }
     };
 
-
-
-
     return (
         <div className="video-container">
             <div className="video-wrapper">
@@ -138,7 +122,7 @@ const startMedia = async () => {
             <div className="video-wrapper">
                 <h3>Remote Video</h3>
                 <video
-                    ref={videoRef}
+                    ref={remoteVideoRef} // ✅ fixed ref
                     autoPlay
                     playsInline
                     width={300}
@@ -151,4 +135,4 @@ const startMedia = async () => {
             </div>
         </div>
     );
-}
+};
