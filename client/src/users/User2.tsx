@@ -12,7 +12,7 @@ export const User2 = () => {
         socketRef.current = socket;
 
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Add STUN server
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Add STUN server  good for real apps
         });
         pcRef.current = pc;
 
@@ -27,13 +27,12 @@ export const User2 = () => {
             if (e.candidate) {
                 console.log('Sending ICE candidate');
                 socket.send(JSON.stringify({
-                    type: 'iceCandidate', // Make consistent with User1
+                    type: 'iceCandidate', 
                     candidate: e.candidate
                 }));
             }
         };
 
-        // Message handling
         socket.onmessage = async (e) => {
             try {
                 const msg = JSON.parse(e.data);
@@ -51,7 +50,7 @@ export const User2 = () => {
                         type: 'createAnswer',
                         sdp: answer
                     }));
-                } else if (msg.type === 'iceCandidate') { // Made consistent
+                } else if (msg.type === 'iceCandidate') { 
                     console.log('Adding ICE candidate');
                     await pc.addIceCandidate(msg.candidate);
                 }
@@ -59,8 +58,6 @@ export const User2 = () => {
                 console.error('Message error:', err);
             }
         };
-
-        // Track handling - fixed to use remoteVideoRef
         pc.ontrack = (event) => {
             let video = remoteVideoRef.current;
             if(!video) return;
@@ -96,7 +93,7 @@ export const User2 = () => {
                 localVideoRef.current.srcObject = stream;
             }
 
-            // Add all tracks to peer connection
+            // Add all tracks to peer  and helpfull for sending on stream 
             stream.getTracks().forEach(track => {
                 pcRef.current?.addTrack(track, stream);
             });

@@ -45,7 +45,6 @@ export const User1 = () => {
             const video = remoteVideoRef.current;
             if (!video) return;
 
-            // Ensure a MediaStream is assigned to the video element
             if (!video.srcObject) {
                 video.srcObject = new MediaStream();
             }
@@ -63,7 +62,10 @@ export const User1 = () => {
 
         startMedia();
 
-        // Cleanup on unmount
+        
+// Camera/mic staying ON after you leave a call
+// WebSocket connections lingering in the background
+// Memory leaks from open RTCPeerConnections
         return () => {
             socket.close();
             pc.close();
