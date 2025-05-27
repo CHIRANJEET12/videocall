@@ -62,10 +62,18 @@ export const User2 = () => {
 
         // Track handling - fixed to use remoteVideoRef
         pc.ontrack = (event) => {
-            if (remoteVideoRef.current) {
-                const remoteStream = new MediaStream();
-                remoteStream.addTrack(event.track);
-                remoteVideoRef.current.srcObject = remoteStream;
+            let video = remoteVideoRef.current;
+            if(!video) return;
+
+            if(!video.srcObject){
+                video.srcObject = new MediaStream();
+            }
+            const stream = video.srcObject;
+            if(stream instanceof MediaStream){
+                stream.addTrack(event.track);
+                video.play().catch(err=>{
+                    console.log(err);
+                })
             }
 
         };

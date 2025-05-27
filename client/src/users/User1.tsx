@@ -6,7 +6,7 @@ export const User1 = () => {
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const remoteStreamRef = useRef<MediaStream | null>(new MediaStream());
+    // const remoteVideoRef = useRef<MediaStream | null>(new MediaStream());
 
     useEffect(() => {
         const socket = new WebSocket('ws://localhost:8080');
@@ -41,15 +41,25 @@ export const User1 = () => {
                 console.warn('Non-JSON message received:', e.data);
             }
         };
-
         pc.ontrack = (event) => {
-            if (remoteStreamRef.current) {
-                remoteStreamRef.current.addTrack(event.track);
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = remoteStreamRef.current;
-                }
+            const video = remoteVideoRef.current;
+            if (!video) return;
+
+            // Ensure a MediaStream is assigned to the video element
+            if (!video.srcObject) {
+                video.srcObject = new MediaStream();
+            }
+
+            const stream = video.srcObject;
+            if (stream instanceof MediaStream) {
+                stream.addTrack(event.track);
+                video.play().catch(err => {
+                    console.warn('Auto-play was prevented:', err);
+                });
             }
         };
+
+
 
         startMedia();
 
@@ -122,7 +132,7 @@ export const User1 = () => {
             <div className="video-wrapper">
                 <h3>Remote Video</h3>
                 <video
-                    ref={remoteVideoRef} // ✅ fixed ref
+                    ref={remoteVideoRef} 
                     autoPlay
                     playsInline
                     width={300}
